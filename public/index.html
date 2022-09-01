@@ -11,15 +11,39 @@
 <body>
     <h1 class="d-flex justify-content-center mb-5" >Welcome to the back-end of The PhantomRealm</h1>
     <ul style="float: right; margin-top: 200px; margin-right: 20px;">
+        
+        
         <h1>Routes are simple and easy to use.</h1> 
-        <h2>Routes:</h1> 
-        <h3>User route:  /users.</h3> 
-        <h5 >There is only one user which the admin,</br>
-            customers don't need to register or login to see and purchase products</h5>
-            <h5>But you can add/register, delete and update users from the back-end</h5>
-        <h3>Product route:  /products.</h3>  
-        <h3>Specific id product route:  /products/the id of the product</h3>
-        <h5>You can add, delete and update products</h5>
+        <table class="table text-light">
+            <thead>
+              <tr>
+
+                <th scope="col">Routes</th>
+                <th scope="col">Address</th>
+                <th scope="col">Explaination</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">User Route</th>
+                <td>/users</td>
+                <td>There is only one user which is the admin,</br>
+                    customers don't need to register or login to see and purchase products.<br>
+                    But you can add, register, login, delete and update users from the back-end if need be</td>
+              </tr>
+              <tr>
+                <th scope="row">Products Route</th>
+                <td>/products</td>
+                <td>Gets all the products</td>
+              </tr>
+              <tr>
+                <th scope="row"></th>
+                <td>/products/:id</td>
+                <td>Gets a specific product by it's id.
+                You can also delete, add and update products</td>
+              </tr>
+            </tbody>
+          </table>
     </ul>
 </body>
 </html>
