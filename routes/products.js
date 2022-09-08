@@ -31,7 +31,7 @@ router.get("/:id", (req, res) => {
   });
 
   //update products
-  router.put("/update_product/:id",middleware, (req, res) => {
+  router.patch("/update_product/:id",middleware, (req, res) => {
     // if(req.user.user_type === "Admin") {
     // the below allows you to only need one const, but every input required is inside of the brackets
     const {
