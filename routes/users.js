@@ -56,7 +56,7 @@ router.post("/register", (req, res) => {
             result[0].password
           );
           if (!isMatch) {
-            res.send("Password incorrect");
+            res.json({msg:"Password incorrect"});
           } else {
             // The information the should be stored inside token
             const payload = {
