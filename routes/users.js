@@ -31,7 +31,7 @@ router.post("/register", (req, res) => {
       con.query(sql, user, (err, result) => {
         if (err) throw err;
         console.log(result);
-        res.json({msg:`Welcome ${(user.full_name)}`});
+        res.json({msg:`Welcome ${(user.full_name)},` `Account ${(user.email)} created`});
       });
     } catch (error) {
       console.log(error);
@@ -103,7 +103,7 @@ jwt.verify(token, process.env.jwtSecret, (error, decodedToken) => {
 });
 });
 
-router.get("/", middleware, (req, res) => {
+router.get("/", (req, res) => {
 try {
   let sql = "SELECT * FROM users";
   con.query(sql, (err, result) => {
