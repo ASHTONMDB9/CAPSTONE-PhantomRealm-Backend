@@ -54,7 +54,7 @@ router.get("/:id", (req, res) => {
         `UPDATE orders set first_name="${first_name}", last_name="${last_name}", country="${country}", street_address="${street_address}", city="${city}", province="${province}", postcode="${postcode}", phone_number="${phone_number}", email="${email}" WHERE id = "${req.params.id}"`,
         (err, result) => {
           if (err) throw err;
-          res.send("order successfully updated");
+          res.json({msg:"Order has been updated"});
         }
       );
     } catch (error) {
@@ -100,7 +100,7 @@ router.get("/:id", (req, res) => {
         email) VALUES ( "${first_name}", "${last_name}", "${country}", "${street_address}", "${city}", "${province}", "${postcode}", "${phone_number}", "${email}")`,
         (err, result) => {
           if (err) throw err;
-          res.send("order successfully created");
+          res.json({msg:"Order has been made and will be processed"});
         }
       );
     } catch (error) {
@@ -118,7 +118,7 @@ router.get("/:id", (req, res) => {
       try {
         con.query(`DELETE FROM orders WHERE id = ${req.params.id}`, (err, result) => {
           if (err) throw err;
-          res.send("Sucessfully deleted this order");
+          res.json({msg:"Deleted your order"});
         });
         // res.send({ id: req.params.id });
       } catch (error) {

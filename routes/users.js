@@ -31,7 +31,7 @@ router.post("/register", (req, res) => {
       con.query(sql, user, (err, result) => {
         if (err) throw err;
         console.log(result);
-        res.send(`User ${(user.full_name, user.email)} created successfully`);
+        res.json({msg:`Welcome ${(user.full_name)}`});
       });
     } catch (error) {
       console.log(error);
@@ -164,7 +164,7 @@ router.get("/:id", (req, res) => {
         `UPDATE users set email="${email}", password="${hash}", full_name="${full_name}", phone_number="${phone_number}", user_type="${user_type}" WHERE id = "${req.params.id}"`,
         (err, result) => {
           if (err) throw err;
-          res.send("user successfully updated");
+          res.json({msg:"Updated Successfully"});
         }
       );
     } catch (error) {

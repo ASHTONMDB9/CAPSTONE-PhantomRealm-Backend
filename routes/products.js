@@ -50,7 +50,7 @@ router.get("/:id", (req, res) => {
         `UPDATE products set title="${title}", description="${description}", category="${category}", image="${image}", price="${price}" WHERE id = "${req.params.id}"`,
         (err, result) => {
           if (err) throw err;
-          res.send("product successfully updated");
+          res.json({msg:"Product updated successfully"});
         }
       );
     } catch (error) {
@@ -88,7 +88,7 @@ router.get("/:id", (req, res) => {
         price) VALUES ( "${title}", "${description}", "${category}", "${image}", "${price}" )`,
         (err, result) => {
           if (err) throw err;
-          res.send("product successfully created");
+          res.json({msg:"New product created"});
         }
       );
     } catch (error) {
@@ -106,7 +106,7 @@ router.get("/:id", (req, res) => {
       try {
         con.query(`DELETE FROM products WHERE id = ${req.params.id}`, (err, result) => {
           if (err) throw err;
-          res.send("Sucessfully deleted this product");
+          res.json({msg:"Deleted this product"});
         });
         // res.send({ id: req.params.id });
       } catch (error) {
