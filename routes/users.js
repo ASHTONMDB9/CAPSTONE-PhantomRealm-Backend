@@ -143,7 +143,7 @@ router.get("/:id", (req, res) => {
   });
 
   //Update users
-  router.patch("/update_user/:id", middleware, (req, res) => {
+  router.put("/update_user/:id", middleware, (req, res) => {
     // the below allows you to only need one const, but every input required is inside of the brackets
     const {
       email,
