@@ -130,7 +130,7 @@ router.post("/forgot-password", (req, res) => {
       const token = jwt.sign(payload, process.env.jwtSecret, { expiresIn: "15m" });
 
       // Build reset link
-      const resetLink = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
+      const resetLink = `https://phantomrealm.netlify.app/reset-password?token=${token}`;
 
       // Send the reset link to frontend so you can use Formspree
       res.json({ msg: "Success", resetLink });
