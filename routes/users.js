@@ -115,6 +115,80 @@ try {
 }
 });
 
+// Forgot password
+router.post("/forgot-password", (req, res) => {
+  const { email } = req.body;
+
+  try {
+    con.query(
+      "SELECT * FROM users WHERE email = ?",
+      [email],
+      (err, result) => {
+        if (err) throw err;
+
+        if (result.length === 0) {
+          return res.json({ msg: "Email not found" });
+        }
+
+        const payload = {
+          user: {
+            id: result[0].id,
+            email: result[0].email,
+          },
+        };
+
+        jwt.sign(
+          payload,
+          process.env.jwtSecret,
+          { expiresIn: "15m" }, // short expiry for security
+          (err, token) => {
+            if (err) throw err;
+
+            // Normally you'd email this token
+            res.json({
+              msg: "Password reset token generated",
+              resetToken: token,
+            });
+          }
+        );
+      }
+    );
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ msg: "Server error" });
+  }
+});
+
+// Reset password
+router.post("/reset-password", (req, res) => {
+  const { token, newPassword } = req.body;
+
+  try {
+    jwt.verify(token, process.env.jwtSecret, (err, decoded) => {
+      if (err) {
+        return res.status(401).json({ msg: "Invalid or expired token" });
+      }
+
+      const salt = bcrypt.genSaltSync(10);
+      const hash = bcrypt.hashSync(newPassword, salt);
+
+      con.query(
+        "UPDATE users SET password = ? WHERE id = ?",
+        [hash, decoded.user.id],
+        (err) => {
+          if (err) throw err;
+
+          res.json({ msg: "Password reset successfully" });
+        }
+      );
+    });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ msg: "Server error" });
+  }
+});
+
+
 // Gets all users
 router.get("/", (req, res) => {
     try {
