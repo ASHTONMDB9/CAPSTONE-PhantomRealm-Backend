@@ -4,7 +4,7 @@ const bcrypt = require('bcryptjs');
 const con = require("../lib/db_connection");
 const jwt = require('jsonwebtoken')
 const middleware = require("../middleware/auth");
-const transporter = require("../utils/email");
+// const transporter = require("../utils/email");
 
 router.post("/register", (req, res) => {
     try {
