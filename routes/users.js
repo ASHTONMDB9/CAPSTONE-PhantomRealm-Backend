@@ -4,6 +4,7 @@ const bcrypt = require('bcryptjs');
 const con = require("../lib/db_connection");
 const jwt = require('jsonwebtoken')
 const middleware = require("../middleware/auth");
+const transporter = require("../utils/email");
 
 router.post("/register", (req, res) => {
     try {
@@ -117,7 +118,7 @@ try {
 
 // Forgot password
 router.post("/forgot-password", (req, res) => {
-  const { email } = req.body;
+  const { email } = req.body; // 🔑 USER EMAIL FROM FORM
 
   try {
     con.query(
@@ -140,14 +141,30 @@ router.post("/forgot-password", (req, res) => {
         jwt.sign(
           payload,
           process.env.jwtSecret,
-          { expiresIn: "15m" }, // short expiry for security
-          (err, token) => {
+          { expiresIn: "15m" },
+          async (err, token) => {
             if (err) throw err;
 
-            // Normally you'd email this token
+            const resetLink =
+              `https://phantomrealm.netlify.app//reset-password?token=${token}`;
+
+            const mailOptions = {
+              from: process.env.EMAIL_USER,
+              to: email, // 🔥 SENDS TO USER'S ENTERED EMAIL
+              subject: "Password Reset Request",
+              html: `
+                <h3>Password Reset</h3>
+                <p>You requested to reset your password.</p>
+                <p>Click the link below:</p>
+                <a href="${resetLink}">Reset Password</a>
+                <p>This link expires in 15 minutes.</p>
+              `,
+            };
+
+            await transporter.sendMail(mailOptions);
+
             res.json({
-              msg: "Password reset token generated",
-              resetToken: token,
+              msg: "Password reset link sent",
             });
           }
         );
