@@ -118,63 +118,29 @@ try {
 
 // Forgot password
 router.post("/forgot-password", (req, res) => {
-  const { email } = req.body; // 🔑 USER EMAIL FROM FORM
+  const { email } = req.body;
 
   try {
-    con.query(
-      "SELECT * FROM users WHERE email = ?",
-      [email],
-      (err, result) => {
-        if (err) throw err;
+    con.query("SELECT * FROM users WHERE email = ?", [email], (err, result) => {
+      if (err) throw err;
+      if (result.length === 0) return res.json({ msg: "Email not found" });
 
-        if (result.length === 0) {
-          return res.json({ msg: "Email not found" });
-        }
+      // Create JWT token for reset link
+      const payload = { user: { id: result[0].id, email: result[0].email } };
+      const token = jwt.sign(payload, process.env.jwtSecret, { expiresIn: "15m" });
 
-        const payload = {
-          user: {
-            id: result[0].id,
-            email: result[0].email,
-          },
-        };
+      // Build reset link
+      const resetLink = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
 
-        jwt.sign(
-          payload,
-          process.env.jwtSecret,
-          { expiresIn: "15m" },
-          async (err, token) => {
-            if (err) throw err;
-
-            const resetLink =
-              `https://phantomrealm.netlify.app//reset-password?token=${token}`;
-
-            const mailOptions = {
-              from: process.env.EMAIL_USER,
-              to: email, // 🔥 SENDS TO USER'S ENTERED EMAIL
-              subject: "Password Reset Request",
-              html: `
-                <h3>Password Reset</h3>
-                <p>You requested to reset your password.</p>
-                <p>Click the link below:</p>
-                <a href="${resetLink}">Reset Password</a>
-                <p>This link expires in 15 minutes.</p>
-              `,
-            };
-
-            await transporter.sendMail(mailOptions);
-
-            res.json({
-              msg: "Password reset link sent",
-            });
-          }
-        );
-      }
-    );
+      // Send the reset link to frontend so you can use Formspree
+      res.json({ msg: "Success", resetLink });
+    });
   } catch (error) {
-    console.log(error);
+    console.error(error);
     res.status(500).json({ msg: "Server error" });
   }
 });
+
 
 // Reset password
 router.post("/reset-password", (req, res) => {
