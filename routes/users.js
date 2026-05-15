@@ -6,8 +6,6 @@ const jwt = require("jsonwebtoken");
 const middleware = require("../middleware/auth");
 const nodemailer = require("nodemailer");
 
-const con = require("../config/index");
-
 router.post("/register", (req, res) => {
   try {
     let sql = "INSERT INTO users SET ?";
