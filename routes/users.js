@@ -199,15 +199,18 @@ router.get("/:id", (req, res) => {
 
 // Delete user
 router.delete("/delete_user/:id", middleware, (req, res) => {
-  con.query(
-    "UPDATE users SET is_deleted = 1 WHERE id = ?",
-    [req.params.id],
-    (err, result) => {
-      if (err) return res.status(400).send(err);
-
-      res.json({ msg: "User deactivated successfully" });
-    }
-  );
+  try {
+    con.query(
+      `DELETE FROM users WHERE id="${req.params.id}"`,
+      (err, result) => {
+        if (err) throw err;
+        res.json({ msg: "User deleted successfully" });
+      }
+    );
+  } catch (error) {
+    console.log(error);
+    res.status(400).send(error);
+  }
 });
 
 //Update users
