@@ -117,6 +117,7 @@ const transporter = nodemailer.createTransport({
   host: "smtp.gmail.com",
   port: 465,
   secure: true,
+
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
@@ -200,7 +201,7 @@ router.post("/forgot-password", (req, res) => {
 
       console.log("EMAIL SENT:", info.response);
 
-      res.json({
+      return res.status(200).json({
         msg: "Reset link sent successfully",
       });
     });
