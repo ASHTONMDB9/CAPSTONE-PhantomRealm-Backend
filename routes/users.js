@@ -190,9 +190,8 @@ router.post("/forgot-password", (req, res) => {
   }
 });
 
-// ==========================================
+
 // RESET PASSWORD
-// ==========================================
 router.post("/reset-password", (req, res) => {
   const { token, newPassword } = req.body;
 
