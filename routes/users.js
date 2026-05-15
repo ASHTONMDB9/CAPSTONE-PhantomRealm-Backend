@@ -5,6 +5,10 @@ const con = require("../lib/db_connection");
 const jwt = require("jsonwebtoken");
 const middleware = require("../middleware/auth");
 
+const nodemailer = require("nodemailer");
+
+const con = require("../config/index");
+
 router.post("/register", (req, res) => {
   try {
     let sql = "INSERT INTO users SET ?";
@@ -111,61 +115,125 @@ router.get("/", (req, res) => {
   }
 });
 
-// Forgot password
+// EMAIL TRANSPORTER
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
+  },
+});
+
+// FORGOT PASSWORD
 router.post("/forgot-password", (req, res) => {
   const { email } = req.body;
 
   try {
-    con.query("SELECT * FROM users WHERE email = ?", [email], (err, result) => {
-      if (err) throw err;
-      if (result.length === 0) return res.json({ msg: "Email not found" });
+    con.query(
+      "SELECT * FROM users WHERE email = ?",
+      [email],
+      async (err, result) => {
+        if (err) throw err;
 
-      // Create JWT token for reset link
-      const payload = { user: { id: result[0].id, email: result[0].email } };
-      const token = jwt.sign(payload, process.env.jwtSecret, {
-        expiresIn: "15m",
-      });
+        if (result.length === 0) {
+          return res.json({
+            msg: "Email not found",
+          });
+        }
 
-      // Build reset link
-      const resetLink = `https://phantomrealm.netlify.app/reset-password?token=${token}`;
+        // CREATE TOKEN
+        const payload = {
+          user: {
+            id: result[0].id,
+            email: result[0].email,
+          },
+        };
 
-      // Send the reset link to frontend so you can use Formspree
-      res.json({ msg: "Success", resetLink });
-    });
+        const token = jwt.sign(payload, process.env.jwtSecret, {
+          expiresIn: "15m",
+        });
+
+        // RESET LINK
+        const resetLink = `https://phantomrealm.netlify.app/reset-password?token=${token}`;
+
+        // EMAIL CONTENT
+        const mailOptions = {
+          from: process.env.EMAIL_USER,
+          to: email,
+          subject: "Reset Your Password",
+          html: `
+            <h2>PhantomRealm Password Reset</h2>
+
+            <p>You requested to reset your password.</p>
+
+            <p>Click the link below:</p>
+
+            <a href="${resetLink}">
+              Reset Password
+            </a>
+
+            <p>This link expires in 15 minutes.</p>
+          `,
+        };
+
+        // SEND EMAIL
+        await transporter.sendMail(mailOptions);
+
+        res.json({
+          msg: "Reset link sent successfully",
+        });
+      }
+    );
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ msg: "Server error" });
+    console.log(error);
+
+    res.status(500).json({
+      msg: "Server error",
+    });
   }
 });
 
-// Reset password
+// ==========================================
+// RESET PASSWORD
+// ==========================================
 router.post("/reset-password", (req, res) => {
   const { token, newPassword } = req.body;
 
   try {
     jwt.verify(token, process.env.jwtSecret, (err, decoded) => {
       if (err) {
-        return res.status(401).json({ msg: "Invalid or expired token" });
+        return res.status(401).json({
+          msg: "Invalid or expired token",
+        });
       }
 
+      // HASH NEW PASSWORD
       const salt = bcrypt.genSaltSync(10);
       const hash = bcrypt.hashSync(newPassword, salt);
 
+      // UPDATE USER PASSWORD
       con.query(
         "UPDATE users SET password = ? WHERE id = ?",
         [hash, decoded.user.id],
         (err) => {
           if (err) throw err;
 
-          res.json({ msg: "Password reset successfully" });
+          res.json({
+            msg: "Password reset successfully",
+          });
         }
       );
     });
   } catch (error) {
     console.log(error);
-    res.status(500).json({ msg: "Server error" });
+
+    res.status(500).json({
+      msg: "Server error",
+    });
   }
 });
+
+module.exports = router;
 
 // Gets all users
 router.get("/", (req, res) => {
