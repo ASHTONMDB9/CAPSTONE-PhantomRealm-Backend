@@ -214,42 +214,26 @@ router.delete("/delete_user/:id", middleware, (req, res) => {
 router.put("/update_user/:id", middleware, (req, res) => {
   const { email, password, full_name, phone_number, user_type } = req.body;
 
+  const salt = bcrypt.genSaltSync(10);
+  const hash = bcrypt.hashSync(password, salt);
+
   try {
-    let query;
-    let values;
-
-    if (password && password.trim() !== "") {
-      const salt = bcrypt.genSaltSync(10);
-      const hash = bcrypt.hashSync(password, salt);
-
-      query = `
-        UPDATE users 
-        SET email=?, password=?, full_name=?, phone_number=?, user_type=? 
-        WHERE id=?
-      `;
-
-      values = [email, hash, full_name, phone_number, user_type, req.params.id];
-    } else {
-      query = `
-        UPDATE users 
-        SET email=?, full_name=?, phone_number=?, user_type=? 
-        WHERE id=?
-      `;
-
-      values = [email, full_name, phone_number, user_type, req.params.id];
-    }
-
-    con.query(query, values, (err, result) => {
-      if (err) {
-        console.log("SQL ERROR:", err);
-        return res.status(400).json({ error: err.sqlMessage || err });
+    con.query(
+      `UPDATE users 
+       SET email="${email}",
+           password="${hash}",
+           full_name="${full_name}",
+           phone_number="${phone_number}",
+           user_type="${user_type}" 
+       WHERE id="${req.params.id}"`,
+      (err, result) => {
+        if (err) throw err;
+        res.json({ msg: "User updated successfully" });
       }
-
-      res.json({ msg: "Updated Successfully" });
-    });
+    );
   } catch (error) {
-    console.log("SERVER ERROR:", error);
-    res.status(500).json({ error });
+    console.log(error);
+    res.status(400).send(error);
   }
 });
 
