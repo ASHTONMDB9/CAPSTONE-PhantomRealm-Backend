@@ -114,122 +114,142 @@ router.get("/", (req, res) => {
 
 // EMAIL TRANSPORTER
 const transporter = nodemailer.createTransport({
-  service: "gmail",
+  host: "smtp.gmail.com",
+  port: 465,
+  secure: true,
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
   },
 });
-
-// FORGOT PASSWORD
-router.post("/forgot-password", (req, res) => {
-  const { email } = req.body;
-
-  try {
-    con.query(
-      "SELECT * FROM users WHERE email = ?",
-      [email],
-      async (err, result) => {
-        if (err) throw err;
-
-        if (result.length === 0) {
-          return res.json({
-            msg: "Email not found",
-          });
-        }
-
-        // CREATE TOKEN
-        const payload = {
-          user: {
-            id: result[0].id,
-            email: result[0].email,
-          },
-        };
-
-        const token = jwt.sign(payload, process.env.jwtSecret, {
-          expiresIn: "15m",
-        });
-
-        // RESET LINK
-        const resetLink = `https://phantomrealm.netlify.app/reset-password?token=${token}`;
-
-        // EMAIL CONTENT
-        const mailOptions = {
-          from: process.env.EMAIL_USER,
-          to: email,
-          subject: "Reset Your Password",
-          html: `
-            <h2>PhantomRealm Password Reset</h2>
-
-            <p>You requested to reset your password.</p>
-
-            <p>Click the link below:</p>
-
-            <a href="${resetLink}">
-              Reset Password
-            </a>
-
-            <p>This link expires in 15 minutes.</p>
-          `,
-        };
-
-        // SEND EMAIL
-        await transporter.sendMail(mailOptions);
-
-        res.json({
-          msg: "Reset link sent successfully",
-        });
-      }
-    );
-  } catch (error) {
-    console.log(error);
-
-    res.status(500).json({
-      msg: "Server error",
-    });
+transporter.verify((error, success) => {
+  if (error) {
+    console.log("SMTP ERROR:", error);
+  } else {
+    console.log("SMTP SERVER READY");
   }
 });
 
+// FORGOT PASSWORD
+router.post("/forgot-password", (req, res) => {
+  console.log("FORGOT PASSWORD ROUTE HIT");
+  console.log(req.body);
+
+  const { email } = req.body;
+
+  con.query("SELECT * FROM users WHERE email = ?", [email], (err, result) => {
+    if (err) {
+      console.log("DATABASE ERROR:", err);
+
+      return res.status(500).json({
+        msg: "Database error",
+      });
+    }
+
+    if (result.length === 0) {
+      return res.json({
+        msg: "Email not found",
+      });
+    }
+
+    // CREATE TOKEN
+    const payload = {
+      user: {
+        id: result[0].id,
+        email: result[0].email,
+      },
+    };
+
+    const token = jwt.sign(payload, process.env.jwtSecret, {
+      expiresIn: "15m",
+    });
+
+    // RESET LINK
+    const resetLink = `https://phantomrealm.netlify.app/reset-password?token=${token}`;
+
+    // EMAIL CONTENT
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: email,
+      subject: "Reset Your Password",
+      html: `
+          <h2>PhantomRealm Password Reset</h2>
+
+          <p>You requested to reset your password.</p>
+
+          <p>Click the link below:</p>
+
+          <a href="${resetLink}">
+            Reset Password
+          </a>
+
+          <p>This link expires in 15 minutes.</p>
+        `,
+    };
+
+    // SEND EMAIL
+    transporter.sendMail(mailOptions, (error, info) => {
+      if (error) {
+        console.log("EMAIL ERROR:", error);
+
+        return res.status(500).json({
+          msg: "Failed to send email",
+          error: error.message,
+        });
+      }
+
+      console.log("EMAIL SENT:", info.response);
+
+      res.json({
+        msg: "Reset link sent successfully",
+      });
+    });
+  });
+});
 
 // RESET PASSWORD
 router.post("/reset-password", (req, res) => {
   const { token, newPassword } = req.body;
 
-  try {
-    jwt.verify(token, process.env.jwtSecret, (err, decoded) => {
-      if (err) {
-        return res.status(401).json({
-          msg: "Invalid or expired token",
-        });
-      }
-
-      // HASH NEW PASSWORD
-      const salt = bcrypt.genSaltSync(10);
-      const hash = bcrypt.hashSync(newPassword, salt);
-
-      // UPDATE USER PASSWORD
-      con.query(
-        "UPDATE users SET password = ? WHERE id = ?",
-        [hash, decoded.user.id],
-        (err) => {
-          if (err) throw err;
-
-          res.json({
-            msg: "Password reset successfully",
-          });
-        }
-      );
-    });
-  } catch (error) {
-    console.log(error);
-
-    res.status(500).json({
-      msg: "Server error",
+  if (!token || !newPassword) {
+    return res.status(400).json({
+      msg: "Token and password are required",
     });
   }
-});
 
-module.exports = router;
+  jwt.verify(token, process.env.jwtSecret, (err, decoded) => {
+    if (err) {
+      console.log("JWT ERROR:", err);
+
+      return res.status(401).json({
+        msg: "Invalid or expired token",
+      });
+    }
+
+    // HASH PASSWORD
+    const salt = bcrypt.genSaltSync(10);
+    const hash = bcrypt.hashSync(newPassword, salt);
+
+    // UPDATE PASSWORD
+    con.query(
+      "UPDATE users SET password = ? WHERE id = ?",
+      [hash, decoded.user.id],
+      (err, result) => {
+        if (err) {
+          console.log("DATABASE ERROR:", err);
+
+          return res.status(500).json({
+            msg: "Database error",
+          });
+        }
+
+        res.json({
+          msg: "Password reset successfully",
+        });
+      }
+    );
+  });
+});
 
 // Gets all users
 router.get("/", (req, res) => {
