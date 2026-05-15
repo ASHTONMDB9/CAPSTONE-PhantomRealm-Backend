@@ -4,7 +4,6 @@ const bcrypt = require("bcryptjs");
 const con = require("../lib/db_connection");
 const jwt = require("jsonwebtoken");
 const middleware = require("../middleware/auth");
-
 const nodemailer = require("nodemailer");
 
 const con = require("../config/index");
