@@ -218,8 +218,7 @@ router.put("/update_user/:id", middleware, (req, res) => {
     let query;
     let values;
 
-    // If password is provided → update it
-    if (password && password.length > 0) {
+    if (password && password.trim() !== "") {
       const salt = bcrypt.genSaltSync(10);
       const hash = bcrypt.hashSync(password, salt);
 
@@ -230,9 +229,7 @@ router.put("/update_user/:id", middleware, (req, res) => {
       `;
 
       values = [email, hash, full_name, phone_number, user_type, req.params.id];
-    }
-    // If no password → DON'T touch password
-    else {
+    } else {
       query = `
         UPDATE users 
         SET email=?, full_name=?, phone_number=?, user_type=? 
@@ -244,15 +241,15 @@ router.put("/update_user/:id", middleware, (req, res) => {
 
     con.query(query, values, (err, result) => {
       if (err) {
-        console.log(err);
-        return res.status(400).json({ error: err });
+        console.log("SQL ERROR:", err);
+        return res.status(400).json({ error: err.sqlMessage || err });
       }
 
       res.json({ msg: "Updated Successfully" });
     });
   } catch (error) {
-    console.log(error);
-    res.status(400).send(error);
+    console.log("SERVER ERROR:", error);
+    res.status(500).json({ error });
   }
 });
 
