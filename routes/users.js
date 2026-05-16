@@ -68,6 +68,7 @@ router.post("/login", (req, res) => {
               full_name: result[0].full_name,
               email: result[0].email,
               user_type: result[0].user_type,
+              phone_number: result[0].phone_number,
             },
           };
           // Creating a token and setting expiry date
