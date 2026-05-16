@@ -118,13 +118,12 @@ router.post("/forgot-password", (req, res) => {
 
       // Email Transport
       const transporter = nodemailer.createTransport({
-        host: "smtp.gmail.com",
+        host: "smtp-relay.brevo.com",
         port: 587,
         secure: false,
-        family: 4, // FORCE IPv4
         auth: {
-          user: process.env.EMAIL_USER,
-          pass: process.env.EMAIL_PASS,
+          user: process.env.BREVO_USER,
+          pass: process.env.BREVO_PASS,
         },
       });
 
