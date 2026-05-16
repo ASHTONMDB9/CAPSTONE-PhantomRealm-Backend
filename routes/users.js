@@ -119,8 +119,9 @@ router.post("/forgot-password", (req, res) => {
       // Email Transport
       const transporter = nodemailer.createTransport({
         host: "smtp.gmail.com",
-        port: 465,
-        secure: true,
+        port: 587,
+        secure: false,
+        family: 4, // FORCE IPv4
         auth: {
           user: process.env.EMAIL_USER,
           pass: process.env.EMAIL_PASS,
@@ -143,37 +144,19 @@ router.post("/forgot-password", (req, res) => {
           `,
       };
 
-      // transporter.sendMail(mailOptions, (error, info) => {
-      //   if (error) {
-      //     console.log(error);
-
-      //     return res.status(500).json({
-      //       msg: "Email failed to send",
-      //     });
-      //   }
-
-      //   res.json({
-      //     msg: "Reset link sent successfully",
-      //   });
-      // });
-
       transporter.sendMail(mailOptions, (error, info) => {
         if (error) {
-          console.log("EMAIL ERROR:", error);
-      
+          console.log(error);
+
           return res.status(500).json({
-            msg: "Failed to send email",
-            error: error.message,
+            msg: "Email failed to send",
           });
         }
-      
-        console.log("EMAIL SENT:", info.response);
-      
+
         res.json({
           msg: "Reset link sent successfully",
         });
       });
-
     });
   } catch (error) {
     console.log(error);
