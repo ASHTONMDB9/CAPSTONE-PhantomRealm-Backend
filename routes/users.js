@@ -122,8 +122,8 @@ router.post("/forgot-password", (req, res) => {
 
           await tranEmailApi.sendTransacEmail({
             sender: {
-              email: "your_verified_sender_email@gmail.com",
-              name: "Phantom Realm",
+              email: "The Phantomrealm<thephantomrealm4427@gmail.com>",
+              name: "The PhantomRealm",
             },
             to: [{ email }],
             subject: "Password Reset Request",
