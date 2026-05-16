@@ -4,7 +4,7 @@ const bcrypt = require("bcryptjs");
 const con = require("../lib/db_connection");
 const jwt = require("jsonwebtoken");
 const middleware = require("../middleware/auth");
-const nodemailer = require("nodemailer");
+const SibApiV3Sdk = require("sib-api-v3-sdk");
 
 router.post("/register", (req, res) => {
   try {
@@ -90,77 +90,65 @@ router.post("/forgot-password", (req, res) => {
   const { email } = req.body;
 
   try {
-    con.query("SELECT * FROM users WHERE email = ?", [email], (err, result) => {
-      if (err) throw err;
+    con.query(
+      "SELECT * FROM users WHERE email = ?",
+      [email],
+      async (err, result) => {
+        if (err) throw err;
 
-      if (result.length === 0) {
-        return res.json({
-          msg: "Email not found",
-        });
-      }
-
-      const user = result[0];
-
-      // Create reset token
-      const resetToken = jwt.sign(
-        {
-          id: user.id,
-          email: user.email,
-        },
-        process.env.jwtSecret,
-        {
-          expiresIn: "15m",
+        if (result.length === 0) {
+          return res.json({ msg: "Email not found" });
         }
-      );
 
-      // Reset URL
-      const resetURL = `${process.env.CLIENT_URL}/reset-password/${resetToken}`;
+        const user = result[0];
 
-      // Email Transport
-      const transporter = nodemailer.createTransport({
-        host: "smtp-relay.brevo.com",
-        port: 587,
-        secure: false,
-        auth: {
-          user: process.env.BREVO_USER,
-          pass: process.env.BREVO_PASS,
-        },
-      });
+        // Create reset token
+        const resetToken = jwt.sign(
+          { id: user.id, email: user.email },
+          process.env.jwtSecret,
+          { expiresIn: "15m" }
+        );
 
-      // Email Message
-      const mailOptions = {
-        from: "The Phantomrealm<thephantomrealm4427@gmail.com>",
-        to: email,
-        subject: "Password Reset Request",
-        html: `
-    <h2>Password Reset</h2>
+        // FRONTEND reset link (IMPORTANT)
+        const resetURL = `${process.env.CLIENT_URL}/reset-password/${resetToken}`;
 
-    <p>Click the link below to reset your password:</p>
+        try {
+          // BREVO API SETUP
+          const client = SibApiV3Sdk.ApiClient.instance;
+          const apiKey = client.authentications["api-key"];
+          apiKey.apiKey = process.env.BREVO_API_KEY;
 
-    <a href="${resetURL}">
-      Reset Password
-    </a>
+          const tranEmailApi = new SibApiV3Sdk.TransactionalEmailsApi();
 
-    <p>This link expires in 15 minutes.</p>
-  `,
-      };
+          await tranEmailApi.sendTransacEmail({
+            sender: {
+              email: "your_verified_sender_email@gmail.com",
+              name: "Phantom Realm",
+            },
+            to: [{ email }],
+            subject: "Password Reset Request",
+            htmlContent: `
+            <h2>Password Reset</h2>
+            <p>Click the link below to reset your password:</p>
+            <a href="${resetURL}">Reset Password</a>
+            <p>This link expires in 15 minutes.</p>
+          `,
+          });
 
-      transporter.sendMail(mailOptions, (error, info) => {
-        if (error) {
-          console.log(error);
+          return res.json({
+            msg: "Reset link sent successfully",
+          });
+        } catch (emailError) {
+          console.log("EMAIL ERROR:", emailError);
 
           return res.status(500).json({
-            msg: "Email failed to send",
+            msg: "Failed to send email",
           });
         }
-
-        res.json({
-          msg: "Reset link sent successfully",
-        });
-      });
-    });
+      }
+    );
   } catch (error) {
-    console.log(error);
+    console.log("FORGOT PASSWORD ERROR:", error);
 
     res.status(500).json({
       msg: "Server error",
@@ -169,19 +157,19 @@ router.post("/forgot-password", (req, res) => {
 });
 
 // Reset Password
-router.post("/reset-password/:token", async (req, res) => {
+router.post("/reset-password/:token", (req, res) => {
   const { password } = req.body;
   const token = req.params.token;
 
   try {
-    // Verify token
+    // verify token
     const decoded = jwt.verify(token, process.env.jwtSecret);
 
-    // Hash new password
+    // hash password
     const salt = bcrypt.genSaltSync(10);
     const hash = bcrypt.hashSync(password, salt);
 
-    // Update password
+    // update password
     con.query(
       "UPDATE users SET password = ? WHERE id = ?",
       [hash, decoded.id],
@@ -194,7 +182,7 @@ router.post("/reset-password/:token", async (req, res) => {
       }
     );
   } catch (error) {
-    console.log(error);
+    console.log("RESET PASSWORD ERROR:", error);
 
     res.status(400).json({
       msg: "Invalid or expired token",
