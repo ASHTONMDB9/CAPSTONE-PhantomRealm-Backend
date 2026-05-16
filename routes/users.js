@@ -24,10 +24,13 @@ router.post("/register", (req, res) => {
       user_type,
     };
     con.query(sql, user, (err, result) => {
-      if (err) throw err;
+      if (err) {
+        console.log(err);
+        return res.status(500).json({ msg: "Database error" });
+      }
       console.log(result);
       res.json({
-        msg: `Welcome ${user.full_name},``Account ${user.email} created`,
+        msg: `Welcome ${user.full_name}, Account ${user.email} created`,
       });
     });
   } catch (error) {
@@ -44,7 +47,10 @@ router.post("/login", (req, res) => {
       email: req.body.email,
     };
     con.query(sql, user, async (err, result) => {
-      if (err) throw err;
+      if (err) {
+        console.log(err);
+        return res.status(500).json({ msg: "Database error" });
+      }
       if (result.length === 0) {
         res.json({ msg: "Email not found please register" });
       } else {
@@ -72,7 +78,10 @@ router.post("/login", (req, res) => {
               expiresIn: "365d",
             },
             (err, token) => {
-              if (err) throw err;
+              if (err) {
+                console.log(err);
+                return res.status(500).json({ msg: "Database error" });
+              }
               res.json({ token });
               console.log(req.body);
             }
@@ -94,7 +103,10 @@ router.post("/forgot-password", (req, res) => {
       "SELECT * FROM users WHERE email = ?",
       [email],
       async (err, result) => {
-        if (err) throw err;
+        if (err) {
+          console.log(err);
+          return res.status(500).json({ msg: "Database error" });
+        }
 
         if (result.length === 0) {
           return res.json({ msg: "Email not found" });
@@ -174,7 +186,10 @@ router.post("/reset-password/:token", (req, res) => {
       "UPDATE users SET password = ? WHERE id = ?",
       [hash, decoded.id],
       (err, result) => {
-        if (err) throw err;
+        if (err) {
+          console.log(err);
+          return res.status(500).json({ msg: "Database error" });
+        }
 
         res.json({
           msg: "Password reset successful",
@@ -205,23 +220,14 @@ router.get("/users/verify", (req, res) => {
   });
 });
 
-router.get("/", (req, res) => {
-  try {
-    let sql = "SELECT * FROM users";
-    con.query(sql, (err, result) => {
-      if (err) throw err;
-      res.send(result);
-    });
-  } catch (error) {
-    console.log(error);
-  }
-});
-
 // Gets all users
 router.get("/", (req, res) => {
   try {
     con.query("SELECT * FROM users", (err, result) => {
-      if (err) throw err;
+      if (err) {
+        console.log(err);
+        return res.status(500).json({ msg: "Database error" });
+      }
       res.json(result);
     });
   } catch (error) {
@@ -242,7 +248,10 @@ router.get("/:id", (req, res) => {
     con.query(
       `SELECT * FROM users WHERE id = ${req.params.id}`,
       (err, result) => {
-        if (err) throw err;
+        if (err) {
+          console.log(err);
+          return res.status(500).json({ msg: "Database error" });
+        }
         res.send(result);
       }
     );
@@ -259,7 +268,10 @@ router.delete("/delete_user/:id", middleware, (req, res) => {
     con.query(
       `DELETE FROM users WHERE id="${req.params.id}"`,
       (err, result) => {
-        if (err) throw err;
+        if (err) {
+          console.log(err);
+          return res.status(500).json({ msg: "Database error" });
+        }
         res.json({ msg: "User deleted successfully" });
       }
     );
@@ -286,7 +298,10 @@ router.put("/update_user/:id", middleware, (req, res) => {
            user_type="${user_type}" 
        WHERE id="${req.params.id}"`,
       (err, result) => {
-        if (err) throw err;
+        if (err) {
+          console.log(err);
+          return res.status(500).json({ msg: "Database error" });
+        }
         res.json({ msg: "User updated successfully" });
       }
     );
