@@ -242,6 +242,12 @@ router.get("/", (req, res) => {
   }
 });
 
+router.get("/reset-password/:token", (req, res) => {
+  res.json({
+    msg: "Reset password route active",
+  });
+});
+
 // Gets one user
 router.get("/:id", (req, res) => {
   try {
