@@ -143,19 +143,37 @@ router.post("/forgot-password", (req, res) => {
           `,
       };
 
+      // transporter.sendMail(mailOptions, (error, info) => {
+      //   if (error) {
+      //     console.log(error);
+
+      //     return res.status(500).json({
+      //       msg: "Email failed to send",
+      //     });
+      //   }
+
+      //   res.json({
+      //     msg: "Reset link sent successfully",
+      //   });
+      // });
+
       transporter.sendMail(mailOptions, (error, info) => {
         if (error) {
-          console.log(error);
-
+          console.log("EMAIL ERROR:", error);
+      
           return res.status(500).json({
-            msg: "Email failed to send",
+            msg: "Failed to send email",
+            error: error.message,
           });
         }
-
+      
+        console.log("EMAIL SENT:", info.response);
+      
         res.json({
           msg: "Reset link sent successfully",
         });
       });
+
     });
   } catch (error) {
     console.log(error);
