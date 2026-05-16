@@ -7,34 +7,37 @@ const middleware = require("../middleware/auth");
 const SibApiV3Sdk = require("sib-api-v3-sdk");
 
 router.post("/register", (req, res) => {
+  const { full_name, email, password, phone_number, user_type } = req.body;
   try {
     let sql = "INSERT INTO users SET ?";
-    const { full_name, email, password, phone_number, user_type } = req.body;
 
-    // The start of hashing / encryption
     const salt = bcrypt.genSaltSync(10);
     const hash = bcrypt.hashSync(password, salt);
 
     let user = {
       full_name,
       email,
-      // We sending the hash value to be stored witin the table
       password: hash,
       phone_number,
       user_type,
     };
     con.query(sql, user, (err, result) => {
       if (err) {
+        if (err.code === "ER_DUP_ENTRY") {
+          return res.status(409).json({
+            msg: "Email already exists",
+          });
+        }
         console.log(err);
         return res.status(500).json({ msg: "Database error" });
       }
-      console.log(result);
-      res.json({
-        msg: `Welcome ${user.full_name}, Account ${user.email} created`,
+      res.status(201).json({
+        msg: "User created successfully",
       });
     });
   } catch (error) {
     console.log(error);
+    res.status(500).json({ msg: "Server error" });
   }
 });
 
