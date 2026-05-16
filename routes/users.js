@@ -4,91 +4,7 @@ const bcrypt = require("bcryptjs");
 const con = require("../lib/db_connection");
 const jwt = require("jsonwebtoken");
 const middleware = require("../middleware/auth");
-const crypto = require("crypto");
 const nodemailer = require("nodemailer");
-
-// EMAIL TRANSPORTER (add env variables)
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
-
-//FORGOT PASSWORD
-router.post("/forgot-password", (req, res) => {
-  const { email } = req.body;
-
-  const sql = "SELECT * FROM users WHERE email = ?";
-
-  con.query(sql, [email], (err, results) => {
-    if (err) throw err;
-
-    if (results.length === 0) {
-      return res.json({ msg: "Email not found" });
-    }
-
-    const token = crypto.randomBytes(32).toString("hex");
-    const expiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
-
-    const updateSql =
-      "UPDATE users SET reset_token = ?, reset_token_expiry = ? WHERE email = ?";
-
-    con.query(updateSql, [token, expiry, email], (err) => {
-      if (err) throw err;
-
-      const resetLink = `https://capstone-phantomrealm-backend.onrender.com/users/reset-password/${token}`;
-
-      const mailOptions = {
-        from: process.env.EMAIL_USER,
-        to: email,
-        subject: "Password Reset Request",
-        html: `
-          <h2>Password Reset</h2>
-          <p>Click below to reset your password:</p>
-          <a href="${resetLink}">${resetLink}</a>
-          <p>This link expires in 1 hour.</p>
-        `,
-      };
-
-      transporter.sendMail(mailOptions, (error) => {
-        if (error) {
-          return res.status(500).json({ msg: "Email failed to send" });
-        }
-
-        res.json({ msg: "Reset link sent successfully" });
-      });
-    });
-  });
-});
-
-router.post("/reset-password", (req, res) => {
-  const { token, newPassword } = req.body;
-
-  const sql =
-    "SELECT * FROM users WHERE reset_token = ? AND reset_token_expiry > NOW()";
-
-  con.query(sql, [token], (err, results) => {
-    if (err) throw err;
-
-    if (results.length === 0) {
-      return res.json({ msg: "Invalid or expired token" });
-    }
-
-    const salt = bcrypt.genSaltSync(10);
-    const hash = bcrypt.hashSync(newPassword, salt);
-
-    const updateSql =
-      "UPDATE users SET password = ?, reset_token = NULL, reset_token_expiry = NULL WHERE reset_token = ?";
-
-    con.query(updateSql, [hash, token], (err) => {
-      if (err) throw err;
-
-      res.json({ msg: "Password reset successfully" });
-    });
-  });
-});
 
 router.post("/register", (req, res) => {
   try {
@@ -166,6 +82,119 @@ router.post("/login", (req, res) => {
     });
   } catch (error) {
     console.log(error);
+  }
+});
+
+// Forgot Password
+router.post("/forgot-password", (req, res) => {
+  const { email } = req.body;
+
+  try {
+    con.query("SELECT * FROM users WHERE email = ?", [email], (err, result) => {
+      if (err) throw err;
+
+      if (result.length === 0) {
+        return res.json({
+          msg: "Email not found",
+        });
+      }
+
+      const user = result[0];
+
+      // Create reset token
+      const resetToken = jwt.sign(
+        {
+          id: user.id,
+          email: user.email,
+        },
+        process.env.jwtSecret,
+        {
+          expiresIn: "15m",
+        }
+      );
+
+      // Reset URL
+      const resetURL = `${process.env.CLIENT_URL}/reset-password/${resetToken}`;
+
+      // Email Transport
+      const transporter = nodemailer.createTransport({
+        service: "gmail",
+        auth: {
+          user: process.env.EMAIL_USER,
+          pass: process.env.EMAIL_PASS,
+        },
+      });
+
+      // Email Message
+      const mailOptions = {
+        from: process.env.EMAIL_USER,
+        to: email,
+        subject: "Password Reset Request",
+        html: `
+            <h2>Password Reset</h2>
+            <p>Click the link below to reset your password:</p>
+            <a href="${resetURL}">
+              Reset Password
+            </a>
+
+            <p>This link expires in 15 minutes.</p>
+          `,
+      };
+
+      transporter.sendMail(mailOptions, (error, info) => {
+        if (error) {
+          console.log(error);
+
+          return res.status(500).json({
+            msg: "Email failed to send",
+          });
+        }
+
+        res.json({
+          msg: "Reset link sent successfully",
+        });
+      });
+    });
+  } catch (error) {
+    console.log(error);
+
+    res.status(500).json({
+      msg: "Server error",
+    });
+  }
+});
+
+// Reset Password
+router.post("/reset-password/:token", async (req, res) => {
+  const { password } = req.body;
+  const token = req.params.token;
+
+  try {
+    // Verify token
+    const decoded = jwt.verify(token, process.env.jwtSecret);
+
+    // Hash new password
+    const salt = bcrypt.genSaltSync(10);
+    const hash = bcrypt.hashSync(password, salt);
+
+    // Update password
+    con.query(
+      "UPDATE users SET password = ? WHERE id = ?",
+      [hash, decoded.id],
+      (err, result) => {
+        if (err) throw err;
+
+        res.json({
+          msg: "Password reset successful",
+        });
+      }
+    );
+  } catch (error) {
+    console.log(error);
+
+    res.status(400).json({
+      msg: "Invalid or expired token",
+    });
   }
 });
 
