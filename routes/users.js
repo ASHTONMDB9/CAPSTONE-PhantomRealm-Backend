@@ -129,18 +129,20 @@ router.post("/forgot-password", (req, res) => {
 
       // Email Message
       const mailOptions = {
-        from: process.env.EMAIL_USER,
+        from: "The Phantomrealm<thephantomrealm4427@gmail.com>",
         to: email,
         subject: "Password Reset Request",
         html: `
-            <h2>Password Reset</h2>
-            <p>Click the link below to reset your password:</p>
-            <a href="${resetURL}">
-              Reset Password
-            </a>
+    <h2>Password Reset</h2>
 
-            <p>This link expires in 15 minutes.</p>
-          `,
+    <p>Click the link below to reset your password:</p>
+
+    <a href="${resetURL}">
+      Reset Password
+    </a>
+
+    <p>This link expires in 15 minutes.</p>
+  `,
       };
 
       transporter.sendMail(mailOptions, (error, info) => {
