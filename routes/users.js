@@ -122,7 +122,7 @@ router.post("/forgot-password", (req, res) => {
 
           await tranEmailApi.sendTransacEmail({
             sender: {
-              email: "The Phantomrealm<thephantomrealm4427@gmail.com>",
+              email: "thephantomrealm4427@gmail.com",
               name: "The PhantomRealm",
             },
             to: [{ email }],
