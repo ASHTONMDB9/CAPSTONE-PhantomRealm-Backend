@@ -18,6 +18,7 @@ app.use('/users', require('./routes/users'))
 app.use('/products', require('./routes/products'))
 app.use('/orders', require('./routes/orders'))
 app.use('/profile-image', require('./routes/profile_image'))
+app.use('/wishlist', require('./routes/wishlist'))
 
 app.listen(app.get("port"), () => {
     console.log(`Listening for calls on port ${app.get("port")}`);
