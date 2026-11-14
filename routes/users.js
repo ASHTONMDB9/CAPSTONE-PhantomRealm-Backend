@@ -7,7 +7,7 @@ const middleware = require("../middleware/auth");
 const SibApiV3Sdk = require("sib-api-v3-sdk");
 
 router.post("/register", (req, res) => {
-  const { full_name, email, password, phone_number, user_type } = req.body;
+  const { full_name, email, password, phone_number } = req.body;
   try {
     let sql = "INSERT INTO users SET ?";
 
@@ -19,7 +19,8 @@ router.post("/register", (req, res) => {
       email,
       password: hash,
       phone_number,
-      user_type,
+      // Never trust the client for the role. Admins are promoted directly in the DB.
+      user_type: "User",
     };
     con.query(sql, user, (err, result) => {
       if (err) {
@@ -285,34 +286,32 @@ router.delete("/delete_user/:id", middleware, (req, res) => {
   }
 });
 
-//Update users
+//Update users (own account only; the role can never be changed through the API)
 router.put("/update_user/:id", middleware, (req, res) => {
-  const { email, password, full_name, phone_number, user_type } = req.body;
-
-  const salt = bcrypt.genSaltSync(10);
-  const hash = bcrypt.hashSync(password, salt);
-
-  try {
-    con.query(
-      `UPDATE users 
-       SET email="${email}",
-           password="${hash}",
-           full_name="${full_name}",
-           phone_number="${phone_number}",
-           user_type="${user_type}" 
-       WHERE id="${req.params.id}"`,
-      (err, result) => {
-        if (err) {
-          console.log(err);
-          return res.status(500).json({ msg: "Database error" });
-        }
-        res.json({ msg: "User updated successfully" });
-      }
-    );
-  } catch (error) {
-    console.log(error);
-    res.status(400).send(error);
+  if (String(req.user.id) !== String(req.params.id)) {
+    return res.status(403).json({ msg: "You can only update your own account" });
   }
+  const { email, password, full_name, phone_number } = req.body;
+  if (!password) {
+    return res.status(400).json({ msg: "Password is required" });
+  }
+
+  const hash = bcrypt.hashSync(password, bcrypt.genSaltSync(10));
+
+  con.query(
+    "UPDATE users SET email = ?, password = ?, full_name = ?, phone_number = ? WHERE id = ?",
+    [email, hash, full_name, phone_number, req.params.id],
+    (err) => {
+      if (err) {
+        console.log(err);
+        if (err.code === "ER_DUP_ENTRY") {
+          return res.status(409).json({ msg: "Email already exists" });
+        }
+        return res.status(500).json({ msg: "Database error" });
+      }
+      res.json({ msg: "User updated successfully" });
+    }
+  );
 });
 
 module.exports = router;
