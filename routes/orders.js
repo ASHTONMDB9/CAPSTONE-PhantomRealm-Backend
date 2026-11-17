@@ -3,6 +3,7 @@ const router = express.Router();
 const con = require("../lib/db_connection");
 const auth = require("../middleware/auth");
 const admin = require("../middleware/admin");
+const wallet = require("../lib/wallet");
 
 const STATUSES = ["pending", "processing", "shipped", "delivered", "cancelled"];
 
@@ -114,7 +115,9 @@ router.post("/", auth, async (req, res) => {
       const p = found.get(pid);
       return { product_id: pid, title: p.title, image: p.image, price: Number(p.price), quantity: qty };
     });
-    const total = lines.reduce((sum, l) => sum + l.price * l.quantity, 0);
+    // work in whole cents so the total never drifts (0.1 + 0.2 style errors)
+    const total =
+      lines.reduce((sum, l) => sum + Math.round(l.price * 100) * l.quantity, 0) / 100;
 
     const [first_name, ...rest] = String(customer.full_name || "").trim().split(/\s+/);
 
@@ -140,14 +143,25 @@ router.post("/", auth, async (req, res) => {
       "INSERT INTO order_items (order_id, product_id, title, image, price, quantity) VALUES ?",
       [lines.map((l) => [result.insertId, l.product_id, l.title, l.image, l.price, l.quantity])]
     );
+    // Pay with in-store credits. If there aren't enough this throws, and the
+    // rollback below removes the order again, so nothing is half-saved.
+    const newBalance = await wallet.spend(conn, customer.id, total, result.insertId);
     await commit(conn);
 
     res.status(201).json({
       msg: "Order placed successfully",
       order: { id: result.insertId, total: Number(total.toFixed(2)), status: "pending" },
+      wallet: { balance: newBalance },
     });
   } catch (error) {
     if (conn) await rollback(conn);
+    if (error instanceof wallet.InsufficientCredits) {
+      return res.status(400).json({
+        msg: `Not enough credits. This order costs ${error.needed.toLocaleString("en-US")} and your wallet has ${error.balance.toLocaleString("en-US")}.`,
+        balance: error.balance,
+        needed: error.needed,
+      });
+    }
     fail(res, error);
   } finally {
     if (conn) conn.release();
@@ -196,44 +210,89 @@ router.get("/:id", auth, async (req, res) => {
   }
 });
 
+// Run `work(conn, order)` in a transaction with the order row locked, so two
+// requests can never refund the same order twice. Returns a http-style result.
+async function withLockedOrder(orderId, work) {
+  const conn = await getConnection();
+  try {
+    await begin(conn);
+    const rows = await query(conn, "SELECT id, user_id, status, total FROM orders WHERE id = ? FOR UPDATE", [orderId]);
+    if (!rows.length) {
+      await rollback(conn);
+      return { code: 404, body: { msg: "Order not found" } };
+    }
+    const result = await work(conn, rows[0]);
+    if (result.code >= 400) await rollback(conn);
+    else await commit(conn);
+    return result;
+  } catch (error) {
+    await rollback(conn);
+    throw error;
+  } finally {
+    conn.release();
+  }
+}
+
+// Give the credits for an order back (only orders that were paid by a user).
+async function refundOrder(conn, order) {
+  if (order.user_id && Number(order.total) > 0) {
+    return wallet.refund(conn, order.user_id, Number(order.total), order.id);
+  }
+  return null;
+}
+
 // ---------- ADMIN: change status ----------
+// Cancelling refunds the credits. A cancelled order can't be reopened (that
+// would need the credits taken again).
 router.put("/:id/status", auth, admin, async (req, res) => {
   const { status } = req.body || {};
   if (!STATUSES.includes(status)) {
     return res.status(400).json({ msg: "Invalid status", allowed: STATUSES });
   }
   try {
-    const r = await query(con, "UPDATE orders SET status = ? WHERE id = ?", [status, req.params.id]);
-    if (!r.affectedRows) return res.status(404).json({ msg: "Order not found" });
-    res.json({ msg: "Order status updated", status });
+    const out = await withLockedOrder(req.params.id, async (conn, order) => {
+      if (order.status === status) return { code: 200, body: { msg: "Order status updated", status } };
+      if (order.status === "cancelled") {
+        return { code: 400, body: { msg: "A cancelled order can't be reopened" } };
+      }
+      await query(conn, "UPDATE orders SET status = ? WHERE id = ?", [status, order.id]);
+      if (status === "cancelled") await refundOrder(conn, order);
+      return { code: 200, body: { msg: "Order status updated", status } };
+    });
+    res.status(out.code).json(out.body);
   } catch (error) {
     fail(res, error);
   }
 });
 
-// ---------- customer: cancel own order while it is still pending ----------
+// ---------- customer: cancel own order while it is still pending (credits refunded) ----------
 router.put("/:id/cancel", auth, async (req, res) => {
   try {
-    const r = await query(
-      con,
-      "UPDATE orders SET status = 'cancelled' WHERE id = ? AND user_id = ? AND status = 'pending'",
-      [req.params.id, req.user.id]
-    );
-    if (!r.affectedRows) {
-      return res.status(400).json({ msg: "Only your own pending orders can be cancelled" });
-    }
-    res.json({ msg: "Order cancelled", status: "cancelled" });
+    const out = await withLockedOrder(req.params.id, async (conn, order) => {
+      if (order.user_id !== req.user.id || order.status !== "pending") {
+        return { code: 400, body: { msg: "Only your own pending orders can be cancelled" } };
+      }
+      await query(conn, "UPDATE orders SET status = 'cancelled' WHERE id = ?", [order.id]);
+      const balance = await refundOrder(conn, order);
+      return { code: 200, body: { msg: "Order cancelled", status: "cancelled", wallet: { balance } } };
+    });
+    res.status(out.code).json(out.body);
   } catch (error) {
     fail(res, error);
   }
 });
 
-// ---------- ADMIN: delete ----------
+// ---------- ADMIN: delete (credits are refunded unless it was delivered or already cancelled) ----------
 router.delete("/:id", auth, admin, async (req, res) => {
   try {
-    const r = await query(con, "DELETE FROM orders WHERE id = ?", [req.params.id]);
-    if (!r.affectedRows) return res.status(404).json({ msg: "Order not found" });
-    res.json({ msg: "Order deleted" });
+    const out = await withLockedOrder(req.params.id, async (conn, order) => {
+      if (order.status !== "delivered" && order.status !== "cancelled") {
+        await refundOrder(conn, order);
+      }
+      await query(conn, "DELETE FROM orders WHERE id = ?", [order.id]);
+      return { code: 200, body: { msg: "Order deleted" } };
+    });
+    res.status(out.code).json(out.body);
   } catch (error) {
     fail(res, error);
   }
